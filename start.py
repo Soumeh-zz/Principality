@@ -1,5 +1,6 @@
-import discord, datetime, asyncio, random, time, os, urllib.request, json, base64, io, aiohttp, requests
+import discord, datetime, asyncio, random, time, os, urllib.request, json, io, aiohttp, requests
 from discord.ext import commands
+from base64 import b64decode
 from lxml import html
 from PIL import Imagefrom int2ronum import *from insult_generator import *
 
@@ -85,14 +86,14 @@ def get_args(message, command):
         return None
 
 def get_JSON(link):
-    content = urllib.request.urlopen(link).read().decode()
+    content = requests.get(link).json()
     if content == '':
-        raise EmptyLinkError
+        return None
     else:
-        return json.loads(content)
-        
-def EmptyLinkError(Exception):
-    pass
+        try:
+            return json.loads(content)
+        except TypeError:
+            return content
 
 async def url_to_file(url):
     async with aiohttp.ClientSession() as session:
@@ -273,56 +274,44 @@ class Random(commands.Cog):
 class Skin(commands.Cog):
     command = prefix + 'skin'
     def help_message(self):
-        return """Send a player's Minecraft skin.``{0} (player) [upscale]``
- \> Returns a Minecraft (player)'s skin.
-   Optionally, specify a [whole number] to upscale the image by.""".format(self.command)
+        return """Send a player's Minecraft skin.``{0} (player)``
+\> Returns a Minecraft (player)'s skin.""".format(self.command)
     @commands.command()    @not_self()
     async def skin(self, ctx):
-        message = ctx.message
         try:
-            arguments = message.content.split()
-            del arguments[0]
-            argument = arguments[0]
-            if argument == '':
-                raise
-        except:
-            return await module_help(message.channel, self.__class__.__name__)
-        try:
-            upscale = int(arguments[1])
-            if upscale < 1:
-                raise ValueError
-            if upscale > 10:
-                raise ValueError
-        except IndexError:
-            upscale = 1
-        except ValueError:
-            return await message.channel.send("Upscale value can only be a whole number from 1 to 10.")
-        try:
-            content = get_JSON('https://api.mojang.com/users/profiles/minecraft/' + argument)
-        except EmptyLinkError:
-            return await message.channel.send("Unknown Player.")
-        except JSONDecodeError:
-            return await message.channel.send("Something went wrong, try again.")
-        skinName = content['name']
-        try:
-            content = get_JSON('https://sessionserver.mojang.com/session/minecraft/profile/' + content['id'])
-        except JSONDecodeError:
-            return await message.channel.send("Something went wrong, try again.")
-        code = content['properties'][0]['value']
-        decodeMe = code.encode('ascii')
-        decoded = base64.b64decode(decodeMe).decode('ascii')
-        content = json.loads(decoded)
-        try:
-            skinURL = content['textures']['SKIN']['url']
-        except FailedResponseError:
-            return await message.channel.send("Something went wrong, try again.")        except:
-            return await message.channel.send("{} does not have a skin.".format(skinName))
-        skinFile = await url_to_file(skinURL)        if upscale > 1:
-            skinImage = Image.open(skinFile)
-            skinImage = skinImage.resize((skinImage.size[0] * upscale, skinImage.size[1] * upscale), Image.NEAREST)            skinFile = io.BytesIO()
-            skinImage.save(skinFile, 'png')            skinFile.seek(0)
-        await message.channel.send("{}\'s Skin:".format(skinName), file=discord.File(skinFile, filename='{}.png'.format(skinName)))
+            arguments = ctx.message.content.split(self.command + ' ')[1]
+            await self.send_skin(ctx.channel, arguments)
+        except Exception as e:
+            print(e)
+            await module_help(ctx.channel, self.__class__.__name__)
+    async def send_skin(self, channel, skin_name):
+        images = []
+        json1 = get_JSON('https://api.mojang.com/users/profiles/minecraft/' + skin_name)
+        if not json1:
+            return await ctx.channel.send("Unknown player")
+        skin_name = json1['name']
+        json2 = get_JSON('https://sessionserver.mojang.com/session/minecraft/profile/' + json1['id'])
+        data = json2['properties'][0]['value']
+        data = b64decode(data).decode('utf-8')
 
+        skin_link = json.loads(data)['textures']['SKIN']['url']
+        image = await url_to_file(skin_link)
+        skin_image = Image.open(image)
+        size = skin_image.size
+        skin_image = skin_image.resize((size[0] * 8, size[1] * 8), Image.NEAREST)
+        image = io.BytesIO()
+        skin_image.save(image, 'png')
+        image.seek(0)
+
+        image = discord.File(image, filename=skin_name + '_large.png')
+        if not skin_name.lower().endswith('s'):
+            desc = "**{}**'s Skin:".format(skin_name)
+        else:
+            desc = "**{}**' Skin:".format(skin_name)
+        embed = discord.Embed(description=desc)
+        embed.set_thumbnail(url=skin_link)
+        embed.set_image(url='attachment://' + image.filename)
+        await channel.send(file=image, embed=embed)
 class Suggestions(commands.Cog):
     suggestions_channel = 807271131924660264
     suggestion_discussion_channel = 630500899654991888
