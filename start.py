@@ -2,7 +2,7 @@ import discord, datetime, asyncio, random, time, os, urllib.request, json, io, a
 from discord.ext import commands
 from base64 import b64decode
 from lxml import html
-from PIL import Imagefrom int2ronum import *from insult_generator import *
+from pil import Imagefrom int2ronum import *from insult_generator import *
 
 
 
@@ -312,6 +312,7 @@ class Skin(commands.Cog):
         embed.set_thumbnail(url=skin_link)
         embed.set_image(url='attachment://' + image.filename)
         await channel.send(file=image, embed=embed)
+
 class Suggestions(commands.Cog):
     suggestions_channel = 807271131924660264
     suggestion_discussion_channel = 630500899654991888
@@ -548,7 +549,7 @@ class Help(commands.Cog):
 
     def help_message(self):
         return """Provides help messages for all active modules.\n
-``{0} (number)``
+``{0} (page)``
  \> View more modules.
 ``{0} (module)``
  \> Provides help for currently running modules.
@@ -593,14 +594,20 @@ class Help(commands.Cog):
 
 # Modules End #
 
+init = False
+
 @bot.listen('on_ready')
 async def on_ready():
-    await async_init()
-    activity = discord.Game(name='Usage: {}help'.format(prefix))
-    await bot.change_presence(activity=activity)
-    print_servers()
+    global init
+    if not init:
+        await async_init()
+        activity = discord.Game(name='Usage: {}help'.format(prefix))
+        await bot.change_presence(activity=activity)
+        print_servers()
+        init = True
 
 async def async_init():
+    global init
     for module in modules:
         try:
             await module.__asinit__(module)

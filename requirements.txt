@@ -2,3 +2,4 @@ discord
 Pillow
 requests
 lxml
+aiohttp
