@@ -1,5 +1,5 @@
 discord
-Pillow
-requests
+pillow
 lxml
 aiohttp
+pyyaml
