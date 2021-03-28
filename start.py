@@ -1,11 +1,10 @@
 import discord
-import sys
+from sys import argv
 from discord.ext import commands
 from os import environ, listdir
 from debug_utils import print_exception
 from importlib import import_module, reload
 from inspect import getmembers, isclass
-from aiohttp import ClientSession
 
 # Configuration #
 
@@ -32,7 +31,6 @@ init = False
 async def on_ready():
     global init
     await bot.change_presence(activity=discord.Game(name=status_message))
-    await slash_commands()
     if not init:
         init = True
         for cog in bot.cogs.values():
@@ -74,23 +72,6 @@ def load_extension(filename):
             except Exception as error:
                 print(error)
 
-async def slash_commands():
-    url = "https://discord.com/api/v8/applications/" + str(bot.user.id) + "/commands"
-    json = {
-        "name": "test",
-        "description": "Test shit",
-        "options": [
-            {
-                "name": "channel",
-                "description": "Get a channel",
-                "type": 7,
-                "required": True,
-            }
-        ]
-    }
-    async with ClientSession() as session:
-        session.post(url, headers={"Authorization": "Bot " + token}, json=json)
-
 def start():
     global token
     bot.remove_command('help')
@@ -100,10 +81,10 @@ def start():
     load_extension('Help')
     print('\nLogging in...')
     try:
-        if len(sys.argv) > 1:
-            token = sys.argv[1]
+        if len(argv) > 1:
+            token = argv[1]
         else:
-            token = environ['BOT_TOKEN']
+            token = environ.get('BOT_TOKEN')
         bot.run(token)
     except discord.errors.LoginFailure:
         input("Invalid bot token.")
