@@ -59,12 +59,13 @@ def get_embed_from_json(json):
     json_dict = {index.lower() : value for index, value in json_dict.items()}
     if 'color' in json_dict:
         if isinstance(json_dict['color'], str):
+            if json_dict['color'].startswith('#'):
+                json_dict['color'] = json_dict['color'].split('#', 1)[1]
             json_dict['color'] = int('0x' + json_dict['color'], 0)
     if 'embed' in json_dict:
         json_dict = json_dict['embed']
     if 'description' in json_dict:
         if isinstance(json_dict['description'], list):
-            print('True')
             json_dict['description'] = '\n'.join(json_dict['description'])
     if 'timestamp' in json_dict:
         json_dict['timestamp'] = json_dict['timestamp'].replace('Z', '000+00:00')

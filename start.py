@@ -5,16 +5,22 @@ from os import environ, listdir
 from debug_utils import print_exception
 from importlib import import_module, reload
 from inspect import getmembers, isclass
+from aiohttp import ClientSession
 
 # Configuration #
 
 prefix = '/'
 status_message = 'Mention Me!'
-module_blacklist = []#['Example']
 
 # Configuration End #
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or(prefix), intents=discord.Intents.all())
+class Bot(commands.Bot):
+    def __init__(self, **kwargs):
+        super(Bot, self).__init__(**kwargs)
+        self.extension_blacklist = []
+
+bot = Bot(command_prefix=commands.when_mentioned_or(prefix), intents=discord.Intents.all())
+bot.extension_blacklist.append('Example')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -26,28 +32,25 @@ init = False
 async def on_ready():
     global init
     await bot.change_presence(activity=discord.Game(name=status_message))
+    await slash_commands()
     if not init:
         init = True
-        await async_init()
+        for cog in bot.cogs.values():
+            await async_load_cog(cog)
         print("\nLoaded Modules: [{}] ".format(len(bot.cogs.keys())) + ', '.join([cog.replace('_', ' ') for cog in bot.cogs.keys()]))
         server_list = [server.name for server in bot.guilds]
         print("\nConnected Servers: [{}] ".format(str(len(server_list))) + ', '.join(server_list))
 
-async def async_init(cog=None):
-    if cog:
-        cogs = [bot.cogs[cog]]
-    else:
-        cogs = bot.cogs.values()
-    for cog in cogs:
-        try:
-            cog.bot = bot
-            await cog.__asinit__()
-        except AttributeError:
-            pass
-        except TypeError as e:
-            pass
-        except Exception as error:
-            print_exception(error)
+async def async_load_cog(cog):
+    try:
+        cog.bot = bot
+        await cog.__asinit__()
+    except AttributeError:
+        pass
+    except TypeError as e:
+        pass
+    except Exception as error:
+        print_exception(error)
 
 def unload_extension(filename):
     extension = import_module(filename)
@@ -58,7 +61,6 @@ def unload_extension(filename):
             bot.remove_cog(cog.__cog_name__)
             reload(extension)
 
-@timer
 def load_extension(filename):
     extension = import_module(filename)
     cog_type = type(commands.Cog)
@@ -72,9 +74,27 @@ def load_extension(filename):
             except Exception as error:
                 print(error)
 
+async def slash_commands():
+    url = "https://discord.com/api/v8/applications/" + str(bot.user.id) + "/commands"
+    json = {
+        "name": "test",
+        "description": "Test shit",
+        "options": [
+            {
+                "name": "channel",
+                "description": "Get a channel",
+                "type": 7,
+                "required": True,
+            }
+        ]
+    }
+    async with ClientSession() as session:
+        session.post(url, headers={"Authorization": "Bot " + token}, json=json)
+
 def start():
+    global token
     bot.remove_command('help')
-    files = [file.rsplit('.py', 1)[0] for file in listdir('modules') if file.endswith('.py') and file.rsplit('.py', 1)[0] not in module_blacklist]
+    files = [file.rsplit('.py', 1)[0] for file in listdir('modules') if file.endswith('.py') and file.rsplit('.py', 1)[0] not in bot.extension_blacklist]
     for file in files:
         load_extension('modules.' + file)
     load_extension('Help')
